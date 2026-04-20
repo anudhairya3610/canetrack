@@ -1,7 +1,10 @@
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession, signToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-
 // GET /api/auth/me — return current user profile
 export async function GET() {
   const session = await getServerSession();
@@ -53,3 +56,4 @@ export async function PUT(req: NextRequest) {
 
   return res;
 }
+
