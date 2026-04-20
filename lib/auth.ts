@@ -22,8 +22,13 @@ export function verifyToken(token: string): JWTPayload | null {
 }
 
 export async function getServerSession(): Promise<JWTPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('canetrack-token')?.value;
-  if (!token) return null;
-  return verifyToken(token);
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('canetrack-token')?.value;
+    if (!token) return null;
+    return verifyToken(token);
+  } catch (error) {
+    console.error('Session error:', error);
+    return null;
+  }
 }
