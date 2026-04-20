@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  village   String
+  password  String
+  language  String   @default("hi")
+  createdAt DateTime @default(now())
+
+  plots          Plot[]
+  workers        Worker[]
+  expenses       Expense[]
+  shops          Shop[]
+  inventoryItems InventoryItem[]
+  reminders      Reminder[]
+  fuelLogs       FuelLog[]
+}
+
+model Plot {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  areaBigha    Float
+  variety      String
+  plantingDate DateTime
+  status       String   @default("growing")
+  createdAt    DateTime @default(now())
+
+  user          User            @relation(fields: [userId], references: [id])
+  photos        PlotPhoto[]
+  workerLogs    PlotWorkerLog[]
+  notes         PlotNote[]
+  sprayLogs     SprayLog[]
+  expenses      Expense[]
+  activities    Activity[]
+  harvestEntries HarvestEntry[]
+  irrigationLogs IrrigationLog[]
+  inventoryLogs  InventoryLog[]
+  reminders      Reminder[]
+  bills          Bill[]
+}
+
+model PlotPhoto {
+  id        String   @id @default(cuid())
+  plotId    String
+  imageUrl  String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  plot Plot @relation(fields: [plotId], references: [id])
+}
+
+model Worker {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  phone        String?
+  workerType   String   @default("daily")
+  wageRateType String   @default("daily")
+  wageAmount   Float
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  user        User            @relation(fields: [userId], references: [id])
+  attendances Attendance[]
+  plotLogs    PlotWorkerLog[]
+  payments    Payment[]
+  advances    Advance[]
+}
+
+model Attendance {
+  id            String   @id @default(cuid())
+  workerId      String
+  date          DateTime
+  status        String   @default("absent")
+  checkIn       String?
+  checkOut      String?
+  overtimeHours Float?   @default(0)
+  overtimeRate  Float?   @default(0)
+  dailyWage     Float?   @default(0)
+  paidToday     Boolean  @default(false)
+  paidAmount    Float?   @default(0)
+  createdAt     DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id])
+
+  @@unique([workerId, date])
+}
+
+model PlotWorkerLog {
+  id        String   @id @default(cuid())
+  plotId    String
+  workerId  String
+  date      DateTime
+  workNote  String?
+  timeIn    String?
+  timeOut   String?
+  createdAt DateTime @default(now())
+
+  plot   Plot   @relation(fields: [plotId], references: [id])
+  worker Worker @relation(fields: [workerId], references: [id])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  workerId   String
+  amount     Float
+  periodFrom DateTime?
+  periodTo   DateTime?
+  mode       String   @default("cash")
+  date       DateTime
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id])
+}
+
+model Advance {
+  id        String   @id @default(cuid())
+  workerId  String
+  amount    Float
+  date      DateTime
+  reason    String?
+  deducted  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  worker Worker @relation(fields: [workerId], references: [id])
+}
+
+model PlotNote {
+  id        String   @id @default(cuid())
+  plotId    String
+  noteType  String   @default("general")
+  content   String
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  plot     Plot        @relation(fields: [plotId], references: [id])
+  images   NoteImage[]
+  reminder Reminder?
+}
+
+model NoteImage {
+  id        String   @id @default(cuid())
+  noteId    String
+  imageUrl  String
+  createdAt DateTime @default(now())
+
+  note PlotNote @relation(fields: [noteId], references: [id])
+}
+
+model SprayLog {
+  id          String   @id @default(cuid())
+  plotId      String
+  sprayType   String   @default("pesticide")
+  description String?
+  cost        Float?
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  plot     Plot        @relation(fields: [plotId], references: [id])
+  images   SprayImage[]
+  reminder Reminder?
+}
+
+model SprayImage {
+  id         String   @id @default(cuid())
+  sprayLogId String
+  imageUrl   String
+  createdAt  DateTime @default(now())
+
+  sprayLog SprayLog @relation(fields: [sprayLogId], references: [id])
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  userId       String
+  plotId       String?
+  shopId       String?
+  billId       String?
+  category     String
+  amount       Float
+  description  String?
+  date         DateTime
+  receiptUrl   String?
+  isRecurring  Boolean  @default(false)
+  recurringType String?
+  createdAt    DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id])
+  plot Plot? @relation(fields: [plotId], references: [id])
+  shop Shop? @relation(fields: [shopId], references: [id])
+}
+
+model Shop {
+  id        String   @id @default(cuid())
+  userId    String
+  shopName  String
+  ownerName String?
+  phone     String?
+  address   String?
+  shopType  String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  bills    Bill[]
+  expenses Expense[]
+}
+
+model Bill {
+  id            String   @id @default(cuid())
+  shopId        String
+  billNumber    String?
+  date          DateTime
+  plotId        String?
+  totalAmount   Float
+  discount      Float?   @default(0)
+  finalAmount   Float
+  paidAmount    Float    @default(0)
+  dueAmount     Float    @default(0)
+  paymentStatus String   @default("credit")
+  billPhotoUrl  String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  shop     Shop         @relation(fields: [shopId], references: [id])
+  plot     Plot?        @relation(fields: [plotId], references: [id])
+  items    BillItem[]
+  payments BillPayment[]
+}
+
+model BillItem {
+  id           String @id @default(cuid())
+  billId       String
+  category     String?
+  itemName     String
+  quantity     Float
+  unit         String?
+  pricePerUnit Float
+  totalPrice   Float
+
+  bill Bill @relation(fields: [billId], references: [id])
+}
+
+model BillPayment {
+  id        String   @id @default(cuid())
+  billId    String
+  amount    Float
+  date      DateTime
+  mode      String   @default("cash")
+  notes     String?
+  createdAt DateTime @default(now())
+
+  bill Bill @relation(fields: [billId], references: [id])
+}
+
+model Activity {
+  id           String   @id @default(cuid())
+  plotId       String
+  activityType String
+  description  String?
+  date         DateTime
+  createdAt    DateTime @default(now())
+
+  plot   Plot            @relation(fields: [plotId], references: [id])
+  images ActivityImage[]
+}
+
+model ActivityImage {
+  id         String   @id @default(cuid())
+  activityId String
+  imageUrl   String
+  createdAt  DateTime @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id])
+}
+
+model HarvestEntry {
+  id            String   @id @default(cuid())
+  plotId        String
+  date          DateTime
+  quantityQtl   Float
+  vehicleNumber String?
+  tokenNumber   String?
+  millName      String?
+  harvesterType String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  plot Plot @relation(fields: [plotId], references: [id])
+}
+
+model IrrigationLog {
+  id              String   @id @default(cuid())
+  plotId          String
+  date            DateTime
+  irrigationType  String
+  durationHours   Float?
+  waterSource     String?
+  fuelUsed        Float?
+  fuelCost        Float?
+  electricityCost Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  plot Plot @relation(fields: [plotId], references: [id])
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  userId       String
+  itemName     String
+  category     String?
+  currentStock Float    @default(0)
+  unit         String?
+  createdAt    DateTime @default(now())
+
+  user User           @relation(fields: [userId], references: [id])
+  logs InventoryLog[]
+}
+
+model InventoryLog {
+  id              String   @id @default(cuid())
+  inventoryItemId String
+  type            String
+  quantity        Float
+  date            DateTime
+  plotId          String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  item InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  plot Plot?         @relation(fields: [plotId], references: [id])
+}
+
+model Reminder {
+  id          String    @id @default(cuid())
+  userId      String
+  plotId      String?
+  noteId      String?   @unique
+  sprayLogId  String?   @unique
+  type        String
+  title       String
+  description String?
+  dueDate     DateTime
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  plot     Plot?     @relation(fields: [plotId], references: [id])
+  note     PlotNote? @relation(fields: [noteId], references: [id])
+  sprayLog SprayLog? @relation(fields: [sprayLogId], references: [id])
+}
+
+model FuelLog {
+  id       String   @id @default(cuid())
+  userId   String
+  date     DateTime
+  fuelType String
+  litres   Float
+  cost     Float
+  purpose  String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
