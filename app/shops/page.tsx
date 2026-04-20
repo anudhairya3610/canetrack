@@ -5,7 +5,7 @@ import { Plus, ShoppingBag, Phone, IndianRupee, ArrowRight } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageToggle from '@/components/LanguageToggle';
 import BottomNav from '@/components/BottomNav';
-
+export const dynamic = 'force-dynamic';
 interface Shop {
   id: string; shopName: string; ownerName?: string; phone?: string; shopType?: string;
   bills: { finalAmount: number; paidAmount: number; dueAmount: number }[];
@@ -40,7 +40,7 @@ export default function ShopsPage() {
       </div>
       <div className="page-content">
         {loading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-32 rounded-2xl shimmer" />)}</div>
+          <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-32 rounded-2xl shimmer" />)}</div>
         ) : shops.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4" style={{ background: 'var(--green-pale)' }}>
