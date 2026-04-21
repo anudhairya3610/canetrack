@@ -34,9 +34,10 @@ export async function POST(req: NextRequest) {
       path: '/',
     });
     return res;
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (err: any) {
+    console.error('LOGIN ERROR:', err?.message, err?.name);
+    return NextResponse.json({
+      error: err?.message || 'Server error',
+      name: err?.name || 'Unknown'
+    }, { status: 500 });
   }
-}
-
