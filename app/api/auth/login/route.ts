@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signToken } from '@/lib/auth';
+
 export async function POST(req: NextRequest) {
   try {
     const { name, password } = await req.json();
@@ -41,3 +42,4 @@ export async function POST(req: NextRequest) {
       name: err?.name || 'Unknown'
     }, { status: 500 });
   }
+}
