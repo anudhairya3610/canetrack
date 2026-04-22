@@ -56,10 +56,15 @@ export default function NewWorkerPage() {
             </div>
             <div>
               <label className="input-label">{t.workers.workerType}</label>
-              <div className="flex gap-2">
-                {[['permanent', t.workers.permanent], ['daily', t.workers.daily]].map(([val, label]) => (
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['daily', t.workers.daily || 'Daily'],
+                  ['monthly', t.workers.permanent || 'Monthly'],
+                  ['contract', 'Contract'],
+                  ['seasonal', 'Seasonal'],
+                ].map(([val, label]) => (
                   <button key={val} type="button" onClick={() => set('workerType', val)}
-                    className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all"
+                    className="py-3 rounded-xl text-sm font-semibold transition-all"
                     style={{ background: form.workerType === val ? 'var(--green-primary)' : 'var(--green-pale)', color: form.workerType === val ? 'white' : 'var(--green-primary)' }}>
                     {label}
                   </button>
@@ -69,7 +74,12 @@ export default function NewWorkerPage() {
             <div>
               <label className="input-label">{t.workers.wageRateType}</label>
               <div className="grid grid-cols-2 gap-2">
-                {[['daily', t.workers.wageDaily], ['halfday', t.workers.wageHalfday], ['hourly', t.workers.wageHourly], ['task', t.workers.wageTask]].map(([val, label]) => (
+                {[
+                  ['daily', t.workers.wageDaily || 'Daily'],
+                  ['monthly', 'Monthly'],
+                  ['perBigha', t.workers.wageTask || 'Per Bigha'],
+                  ['perTask', 'Per Task'],
+                ].map(([val, label]) => (
                   <button key={val} type="button" onClick={() => set('wageRateType', val)}
                     className="py-2.5 rounded-xl text-sm font-medium transition-all"
                     style={{ background: form.wageRateType === val ? 'var(--green-primary)' : 'var(--green-pale)', color: form.wageRateType === val ? 'white' : 'var(--green-primary)' }}>

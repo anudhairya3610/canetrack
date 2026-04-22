@@ -13,13 +13,27 @@ interface Worker {
   payments: { amount: number }[];
 }
 
+const WORKER_TYPE_LABELS: Record<string, string> = {
+  daily: 'Daily / दैनिक',
+  monthly: 'Monthly / मासिक',
+  contract: 'Contract / ठेका',
+  seasonal: 'Seasonal / मौसमी',
+};
+
+const WAGE_TYPE_LABELS: Record<string, string> = {
+  daily: 'day',
+  monthly: 'month',
+  perBigha: 'bigha',
+  perTask: 'task',
+};
+
 export default function WorkersPage() {
   const { t } = useLanguage();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/workers').then(r => r.json()).then(d => { setWorkers(d); setLoading(false); }).catch(() => setLoading(false));
+    fetch('/api/workers').then(r => r.json()).then(d => { setWorkers(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   const todayStatus = (w: Worker) => {
@@ -34,20 +48,10 @@ export default function WorkersPage() {
     return unpaidWages + advances;
   };
 
-  const wageLabel = (type: string) => {
-    const map: Record<string, string> = {
-      daily: t.workers.wageDaily,
-      halfday: t.workers.wageHalfday,
-      hourly: t.workers.wageHourly,
-      task: t.workers.wageTask,
-    };
-    return map[type] || type;
-  };
-
   const statusIcon = (status: string | null) => {
     if (status === 'present') return <CheckCircle size={16} className="text-green-500" />;
     if (status === 'absent') return <XCircle size={16} style={{ color: '#ef4444' }} />;
-    if (status === 'halfday') return <Clock size={16} style={{ color: '#f59e0b' }} />;
+    if (status === 'halfDay') return <Clock size={16} style={{ color: '#f59e0b' }} />;
     return null;
   };
 
@@ -75,7 +79,7 @@ export default function WorkersPage() {
 
       <div className="page-content pt-0">
         {loading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-28 rounded-2xl shimmer" />)}</div>
+          <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-28 rounded-2xl shimmer" />)}</div>
         ) : workers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4" style={{ background: 'var(--green-pale)' }}>
@@ -110,12 +114,14 @@ export default function WorkersPage() {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {statusIcon(status)}
-                      <span className="badge badge-green text-xs">{w.workerType === 'permanent' ? t.workers.permanent : t.workers.daily}</span>
+                      <span className="badge badge-green text-xs">
+                        {WORKER_TYPE_LABELS[w.workerType] || w.workerType}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border-color)' }}>
                     <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      ₹{w.wageAmount}/{wageLabel(w.wageRateType)}
+                      ₹{w.wageAmount}/{WAGE_TYPE_LABELS[w.wageRateType] || w.wageRateType}
                     </span>
                     {due > 0 && (
                       <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#dc2626' }}>
