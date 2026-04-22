@@ -7,6 +7,135 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+// ============ ENUMS ============
+
+enum PlotStatus {
+  growing
+  harvested
+  fallow
+  abandoned
+}
+
+enum WorkerType {
+  daily
+  monthly
+  contract
+  seasonal
+}
+
+enum WageRateType {
+  daily
+  monthly
+  perBigha
+  perTask
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  halfDay
+  overtime
+}
+
+enum PaymentMode {
+  cash
+  upi
+  bank
+  cheque
+}
+
+enum ExpenseCategory {
+  labour
+  spray
+  fertilizer
+  irrigation
+  fuel
+  transport
+  purchase
+  advance
+  equipment
+  seeds
+  rent
+  maintenance
+  other
+}
+
+enum ExpenseSource {
+  manual
+  payment
+  advance
+  sprayLog
+  irrigationLog
+  fuelLog
+  billPayment
+  attendance
+}
+
+enum SprayType {
+  pesticide
+  herbicide
+  fungicide
+  fertilizer
+  growth_promoter
+  other
+}
+
+enum NoteType {
+  general
+  observation
+  problem
+  reminder
+  weather
+}
+
+enum BillPaymentStatus {
+  paid
+  credit
+  partial
+}
+
+enum IrrigationType {
+  tube_well
+  canal
+  drip
+  sprinkler
+  flood
+  other
+}
+
+enum InventoryLogType {
+  purchase
+  used
+  returned
+  damaged
+  adjustment
+}
+
+enum FuelType {
+  diesel
+  petrol
+  electric
+}
+
+enum ReminderType {
+  spray
+  irrigation
+  harvest
+  payment
+  general
+  note
+}
+
+enum RecurringType {
+  daily
+  weekly
+  monthly
+  yearly
+}
+
+// ============ MODELS ============
+
 model User {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -22,30 +151,35 @@ model User {
   inventoryItems InventoryItem[]
   reminders      Reminder[]
   fuelLogs       FuelLog[]
+
+  @@index([name])
 }
 
 model Plot {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   userId       String
   name         String
   areaBigha    Float
   variety      String
   plantingDate DateTime
-  status       String   @default("growing")
-  createdAt    DateTime @default(now())
+  status       PlotStatus @default(growing)
+  createdAt    DateTime   @default(now())
 
-  user          User            @relation(fields: [userId], references: [id])
-  photos        PlotPhoto[]
-  workerLogs    PlotWorkerLog[]
-  notes         PlotNote[]
-  sprayLogs     SprayLog[]
-  expenses      Expense[]
-  activities    Activity[]
+  user           User            @relation(fields: [userId], references: [id])
+  photos         PlotPhoto[]
+  workerLogs     PlotWorkerLog[]
+  notes          PlotNote[]
+  sprayLogs      SprayLog[]
+  expenses       Expense[]
+  activities     Activity[]
   harvestEntries HarvestEntry[]
   irrigationLogs IrrigationLog[]
   inventoryLogs  InventoryLog[]
   reminders      Reminder[]
   bills          Bill[]
+
+  @@index([userId])
+  @@index([status])
 }
 
 model PlotPhoto {
@@ -55,44 +189,51 @@ model PlotPhoto {
   caption   String?
   createdAt DateTime @default(now())
 
-  plot Plot @relation(fields: [plotId], references: [id])
+  plot Plot @relation(fields: [plotId], references: [id], onDelete: Cascade)
+
+  @@index([plotId])
 }
 
 model Worker {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   userId       String
   name         String
   phone        String?
-  workerType   String   @default("daily")
-  wageRateType String   @default("daily")
+  workerType   WorkerType   @default(daily)
+  wageRateType WageRateType @default(daily)
   wageAmount   Float
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
 
   user        User            @relation(fields: [userId], references: [id])
   attendances Attendance[]
   plotLogs    PlotWorkerLog[]
   payments    Payment[]
   advances    Advance[]
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Attendance {
-  id            String   @id @default(cuid())
+  id            String           @id @default(cuid())
   workerId      String
   date          DateTime
-  status        String   @default("absent")
+  status        AttendanceStatus @default(absent)
   checkIn       String?
   checkOut      String?
-  overtimeHours Float?   @default(0)
-  overtimeRate  Float?   @default(0)
-  dailyWage     Float?   @default(0)
-  paidToday     Boolean  @default(false)
-  paidAmount    Float?   @default(0)
-  createdAt     DateTime @default(now())
+  overtimeHours Float?           @default(0)
+  overtimeRate  Float?           @default(0)
+  dailyWage     Float?           @default(0)
+  paidToday     Boolean          @default(false)
+  paidAmount    Float?           @default(0)
+  createdAt     DateTime         @default(now())
 
   worker Worker @relation(fields: [workerId], references: [id])
 
   @@unique([workerId, date])
+  @@index([workerId])
+  @@index([date])
 }
 
 model PlotWorkerLog {
@@ -105,22 +246,29 @@ model PlotWorkerLog {
   timeOut   String?
   createdAt DateTime @default(now())
 
-  plot   Plot   @relation(fields: [plotId], references: [id])
+  plot   Plot   @relation(fields: [plotId], references: [id], onDelete: Cascade)
   worker Worker @relation(fields: [workerId], references: [id])
+
+  @@index([plotId])
+  @@index([workerId])
+  @@index([date])
 }
 
 model Payment {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   workerId   String
   amount     Float
   periodFrom DateTime?
   periodTo   DateTime?
-  mode       String   @default("cash")
+  mode       PaymentMode @default(cash)
   date       DateTime
   notes      String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime    @default(now())
 
   worker Worker @relation(fields: [workerId], references: [id])
+
+  @@index([workerId])
+  @@index([date])
 }
 
 model Advance {
@@ -133,19 +281,25 @@ model Advance {
   createdAt DateTime @default(now())
 
   worker Worker @relation(fields: [workerId], references: [id])
+
+  @@index([workerId])
+  @@index([date])
 }
 
 model PlotNote {
   id        String   @id @default(cuid())
   plotId    String
-  noteType  String   @default("general")
+  noteType  NoteType @default(general)
   content   String
   date      DateTime
   createdAt DateTime @default(now())
 
-  plot     Plot        @relation(fields: [plotId], references: [id])
+  plot     Plot        @relation(fields: [plotId], references: [id], onDelete: Cascade)
   images   NoteImage[]
   reminder Reminder?
+
+  @@index([plotId])
+  @@index([date])
 }
 
 model NoteImage {
@@ -154,21 +308,26 @@ model NoteImage {
   imageUrl  String
   createdAt DateTime @default(now())
 
-  note PlotNote @relation(fields: [noteId], references: [id])
+  note PlotNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
 }
 
 model SprayLog {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   plotId      String
-  sprayType   String   @default("pesticide")
+  sprayType   SprayType @default(pesticide)
   description String?
   cost        Float?
   date        DateTime
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  plot     Plot        @relation(fields: [plotId], references: [id])
+  plot     Plot         @relation(fields: [plotId], references: [id], onDelete: Cascade)
   images   SprayImage[]
   reminder Reminder?
+
+  @@index([plotId])
+  @@index([date])
 }
 
 model SprayImage {
@@ -177,27 +336,41 @@ model SprayImage {
   imageUrl   String
   createdAt  DateTime @default(now())
 
-  sprayLog SprayLog @relation(fields: [sprayLogId], references: [id])
+  sprayLog SprayLog @relation(fields: [sprayLogId], references: [id], onDelete: Cascade)
+
+  @@index([sprayLogId])
 }
 
 model Expense {
-  id           String   @id @default(cuid())
-  userId       String
-  plotId       String?
-  shopId       String?
-  billId       String?
-  category     String
-  amount       Float
-  description  String?
-  date         DateTime
-  receiptUrl   String?
-  isRecurring  Boolean  @default(false)
-  recurringType String?
-  createdAt    DateTime @default(now())
+  id            String          @id @default(cuid())
+  userId        String
+  plotId        String?
+  shopId        String?
+  billId        String?
+  category      ExpenseCategory
+  sourceType    ExpenseSource   @default(manual)
+  sourceId      String?
+  amount        Float
+  description   String?
+  date          DateTime
+  receiptUrl    String?
+  isRecurring   Boolean         @default(false)
+  recurringType RecurringType?
+  createdAt     DateTime        @default(now())
 
   user User  @relation(fields: [userId], references: [id])
   plot Plot? @relation(fields: [plotId], references: [id])
   shop Shop? @relation(fields: [shopId], references: [id])
+  bill Bill? @relation(fields: [billId], references: [id])
+
+  @@unique([sourceType, sourceId])
+  @@index([userId])
+  @@index([plotId])
+  @@index([date])
+  @@index([category])
+  @@index([userId, plotId])
+  @@index([userId, date])
+  @@index([userId, category])
 }
 
 model Shop {
@@ -214,32 +387,40 @@ model Shop {
   user     User      @relation(fields: [userId], references: [id])
   bills    Bill[]
   expenses Expense[]
+
+  @@index([userId])
 }
 
 model Bill {
-  id            String   @id @default(cuid())
+  id            String            @id @default(cuid())
   shopId        String
   billNumber    String?
   date          DateTime
   plotId        String?
   totalAmount   Float
-  discount      Float?   @default(0)
+  discount      Float?            @default(0)
   finalAmount   Float
-  paidAmount    Float    @default(0)
-  dueAmount     Float    @default(0)
-  paymentStatus String   @default("credit")
+  paidAmount    Float             @default(0)
+  dueAmount     Float             @default(0)
+  paymentStatus BillPaymentStatus @default(credit)
   billPhotoUrl  String?
   notes         String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime          @default(now())
 
-  shop     Shop         @relation(fields: [shopId], references: [id])
-  plot     Plot?        @relation(fields: [plotId], references: [id])
+  shop     Shop          @relation(fields: [shopId], references: [id])
+  plot     Plot?         @relation(fields: [plotId], references: [id])
   items    BillItem[]
   payments BillPayment[]
+  expenses Expense[]
+
+  @@index([shopId])
+  @@index([plotId])
+  @@index([date])
+  @@index([paymentStatus])
 }
 
 model BillItem {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   billId       String
   category     String?
   itemName     String
@@ -248,19 +429,24 @@ model BillItem {
   pricePerUnit Float
   totalPrice   Float
 
-  bill Bill @relation(fields: [billId], references: [id])
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
 }
 
 model BillPayment {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   billId    String
   amount    Float
   date      DateTime
-  mode      String   @default("cash")
+  mode      PaymentMode @default(cash)
   notes     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
-  bill Bill @relation(fields: [billId], references: [id])
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@index([date])
 }
 
 model Activity {
@@ -271,8 +457,11 @@ model Activity {
   date         DateTime
   createdAt    DateTime @default(now())
 
-  plot   Plot            @relation(fields: [plotId], references: [id])
+  plot   Plot            @relation(fields: [plotId], references: [id], onDelete: Cascade)
   images ActivityImage[]
+
+  @@index([plotId])
+  @@index([date])
 }
 
 model ActivityImage {
@@ -281,7 +470,9 @@ model ActivityImage {
   imageUrl   String
   createdAt  DateTime @default(now())
 
-  activity Activity @relation(fields: [activityId], references: [id])
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
 }
 
 model HarvestEntry {
@@ -296,23 +487,29 @@ model HarvestEntry {
   notes         String?
   createdAt     DateTime @default(now())
 
-  plot Plot @relation(fields: [plotId], references: [id])
+  plot Plot @relation(fields: [plotId], references: [id], onDelete: Cascade)
+
+  @@index([plotId])
+  @@index([date])
 }
 
 model IrrigationLog {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   plotId          String
   date            DateTime
-  irrigationType  String
+  irrigationType  IrrigationType
   durationHours   Float?
   waterSource     String?
   fuelUsed        Float?
   fuelCost        Float?
   electricityCost Float?
   notes           String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime       @default(now())
 
-  plot Plot @relation(fields: [plotId], references: [id])
+  plot Plot @relation(fields: [plotId], references: [id], onDelete: Cascade)
+
+  @@index([plotId])
+  @@index([date])
 }
 
 model InventoryItem {
@@ -326,51 +523,65 @@ model InventoryItem {
 
   user User           @relation(fields: [userId], references: [id])
   logs InventoryLog[]
+
+  @@index([userId])
 }
 
 model InventoryLog {
-  id              String   @id @default(cuid())
+  id              String           @id @default(cuid())
   inventoryItemId String
-  type            String
+  type            InventoryLogType
   quantity        Float
   date            DateTime
   plotId          String?
   notes           String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime         @default(now())
 
-  item InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  item InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   plot Plot?         @relation(fields: [plotId], references: [id])
+
+  @@index([inventoryItemId])
+  @@index([plotId])
+  @@index([date])
 }
 
 model Reminder {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String
   plotId      String?
-  noteId      String?   @unique
-  sprayLogId  String?   @unique
-  type        String
+  noteId      String?      @unique
+  sprayLogId  String?      @unique
+  type        ReminderType
   title       String
   description String?
   dueDate     DateTime
-  isCompleted Boolean   @default(false)
+  isCompleted Boolean      @default(false)
   completedAt DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime     @default(now())
 
   user     User      @relation(fields: [userId], references: [id])
   plot     Plot?     @relation(fields: [plotId], references: [id])
   note     PlotNote? @relation(fields: [noteId], references: [id])
   sprayLog SprayLog? @relation(fields: [sprayLogId], references: [id])
+
+  @@index([userId])
+  @@index([plotId])
+  @@index([dueDate])
+  @@index([isCompleted])
 }
 
 model FuelLog {
-  id       String   @id @default(cuid())
-  userId   String
-  date     DateTime
-  fuelType String
-  litres   Float
-  cost     Float
-  purpose  String?
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  fuelType  FuelType
+  litres    Float
+  cost      Float
+  purpose   String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([date])
 }

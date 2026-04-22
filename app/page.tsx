@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, Users, Layers, AlertCircle, Plus, CalendarCheck, IndianRupee, Wheat, Bell, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Layers, AlertCircle, Plus, CalendarCheck, IndianRupee, Wheat, Bell, Activity, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageToggle from '@/components/LanguageToggle';
 import BottomNav from '@/components/BottomNav';
@@ -11,16 +11,36 @@ import { format } from 'date-fns';
 
 const COLORS = ['#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2', '#b7e4c7', '#a05c04', '#d97706', '#f59e0b'];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  labour: 'Labour / मज़दूरी',
+  spray: 'Spray / छिड़काव',
+  fertilizer: 'Fertilizer / खाद',
+  irrigation: 'Irrigation / सिंचाई',
+  fuel: 'Fuel / ईंधन',
+  transport: 'Transport / ढुलाई',
+  purchase: 'Purchase / खरीद',
+  advance: 'Advance / बकाया',
+  equipment: 'Equipment / उपकरण',
+  seeds: 'Seeds / बीज',
+  rent: 'Rent / किराया',
+  maintenance: 'Maintenance / रखरखाव',
+  other: 'Other / अन्य',
+};
+
 interface DashboardData {
   totalExpense: number;
   totalHarvestQtl: number;
   activeWorkers: number;
   pendingDues: number;
+  pendingWages: number;
+  pendingAdvances: number;
   totalPlots: number;
+  unpaidBills: number;
+  totalBillDue: number;
   recentActivities: { id: string; activityType: string; date: string; plot: { name: string } }[];
   upcomingReminders: { id: string; title: string; dueDate: string; plot?: { name: string } }[];
   monthlyData: { month: string; expense: number }[];
-  categoryBreakdown: { name: string; value: number }[];
+  categoryBreakdown: { name: string; value: number; count?: number }[];
 }
 
 export default function DashboardPage() {
@@ -28,12 +48,16 @@ export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetch('/api/dashboard')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load');
+        return r.json();
+      })
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setError(true); setLoading(false); });
   }, []);
 
   const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -53,6 +77,18 @@ export default function DashboardPage() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-2xl shimmer" />)}
+          </div>
+        ) : error ? (
+          <div className="card text-center py-8">
+            <AlertCircle size={32} className="mx-auto mb-2" style={{ color: '#dc2626' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Failed to load dashboard</p>
+            <button
+              onClick={() => { setLoading(true); setError(false); fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => { setError(true); setLoading(false); }); }}
+              className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: 'var(--green-primary)' }}
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <>
@@ -86,11 +122,33 @@ export default function DashboardPage() {
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#fef3c7' }}>
                   <IndianRupee size={20} style={{ color: '#d97706' }} />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-medium" style={{ color: '#92400e' }}>{t.dashboard.pendingDues}</p>
                   <p className="text-lg font-bold" style={{ color: '#7c4d03' }}>{fmt(data?.pendingDues || 0)}</p>
+                  <div className="flex gap-3 mt-0.5">
+                    {(data?.pendingWages || 0) > 0 && (
+                      <span className="text-xs" style={{ color: '#92400e' }}>Wages: {fmt(data?.pendingWages || 0)}</span>
+                    )}
+                    {(data?.pendingAdvances || 0) > 0 && (
+                      <span className="text-xs" style={{ color: '#92400e' }}>Advances: {fmt(data?.pendingAdvances || 0)}</span>
+                    )}
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Unpaid Bills Banner */}
+            {(data?.totalBillDue || 0) > 0 && (
+              <Link href="/shops" className="card mb-4 flex items-center gap-3 animate-fade-in" style={{ background: '#fef2f2', borderColor: '#fecaca' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#fee2e2' }}>
+                  <ShoppingBag size={20} style={{ color: '#dc2626' }} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium" style={{ color: '#991b1b' }}>Unpaid Bills ({data?.unpaidBills || 0})</p>
+                  <p className="text-lg font-bold" style={{ color: '#7f1d1d' }}>{fmt(data?.totalBillDue || 0)}</p>
+                </div>
+                <span className="text-xs font-medium" style={{ color: '#dc2626' }}>View →</span>
+              </Link>
             )}
 
             {/* Quick Actions */}
@@ -127,7 +185,7 @@ export default function DashboardPage() {
                       <div key={i} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5">
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                          <span style={{ color: 'var(--text-secondary)' }} className="capitalize">{item.name}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{CATEGORY_LABELS[item.name] || item.name}</span>
                         </div>
                         <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(item.value)}</span>
                       </div>

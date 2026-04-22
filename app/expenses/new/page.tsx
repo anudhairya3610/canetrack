@@ -6,7 +6,37 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageToggle from '@/components/LanguageToggle';
 
-const CATS = ['seed', 'fertilizer', 'pesticide', 'irrigation', 'machinery', 'labour', 'transport', 'rent', 'loanEmi', 'maintenance', 'misc'];
+// ✅ Matches ExpenseCategory enum in schema.prisma
+const CATS = [
+  'labour',
+  'spray',
+  'seeds',
+  'fertilizer',
+  'irrigation',
+  'fuel',
+  'transport',
+  'equipment',
+  'purchase',
+  'advance',
+  'rent',
+  'other',
+];
+
+// Fallback labels in case translations don't have all keys
+const CAT_LABELS: Record<string, string> = {
+  labour: 'Labour / मजदूरी',
+  spray: 'Spray / छिड़काव',
+  seeds: 'Seeds / बीज',
+  fertilizer: 'Fertilizer / खाद',
+  irrigation: 'Irrigation / सिंचाई',
+  fuel: 'Fuel / ईंधन',
+  transport: 'Transport / ढुलाई',
+  equipment: 'Equipment / उपकरण',
+  purchase: 'Shop Purchase / दुकान खरीद',
+  advance: 'Advance / अग्रिम',
+  rent: 'Rent / किराया',
+  other: 'Other / अन्य',
+};
 
 interface Plot { id: string; name: string; }
 interface Shop { id: string; shopName: string; }
@@ -18,7 +48,7 @@ export default function AddExpensePage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    category: '', amount: '', description: '', plotId: '', shopId: '', isRecurring: false,
+    category: '', amount: '', description: '', plotId: '', shopId: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,14 +59,31 @@ export default function AddExpensePage() {
     fetch('/api/shops').then(r => r.json()).then(d => setShops(Array.isArray(d) ? d : []));
   }, []);
 
+  const getCatLabel = (c: string) => {
+    const translated = t.expenses?.categories?.[c as keyof typeof t.expenses.categories];
+    return translated || CAT_LABELS[c] || c;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (!form.category || !form.amount) { setError(t.common.required); return; }
+
+    const amount = parseFloat(form.amount);
+    if (isNaN(amount) || amount <= 0) { setError('Amount must be a positive number'); return; }
+
     setLoading(true);
     try {
       const res = await fetch('/api/expenses', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          date: form.date,
+          category: form.category,
+          amount,
+          description: form.description || null,
+          plotId: form.plotId || null,
+          shopId: form.shopId || null,
+        }),
       });
       if (res.ok) router.push('/expenses');
       else { const d = await res.json(); setError(d.error || t.common.error); }
@@ -67,7 +114,7 @@ export default function AddExpensePage() {
               <div className="relative">
                 <select value={form.category} onChange={e => set('category', e.target.value)} className="input-field appearance-none pr-8" required>
                   <option value="">{t.expenses.category}</option>
-                  {CATS.map(c => <option key={c} value={c}>{t.expenses.categories[c as keyof typeof t.expenses.categories]}</option>)}
+                  {CATS.map(c => <option key={c} value={c}>{getCatLabel(c)}</option>)}
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
               </div>
@@ -102,15 +149,6 @@ export default function AddExpensePage() {
                 </div>
               </div>
             )}
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className="relative">
-                <input type="checkbox" checked={form.isRecurring} onChange={e => set('isRecurring', e.target.checked)} className="sr-only" />
-                <div className="w-12 h-6 rounded-full transition-all" style={{ background: form.isRecurring ? 'var(--green-primary)' : '#d1d5db' }}>
-                  <div className="w-5 h-5 bg-white rounded-full shadow-sm transition-all mt-0.5" style={{ marginLeft: form.isRecurring ? '26px' : '2px' }} />
-                </div>
-              </div>
-              <span className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>{t.expenses.recurring}</span>
-            </label>
           </div>
           {error && <div className="text-sm font-medium px-4 py-3 rounded-xl" style={{ background: '#fee2e2', color: '#dc2626' }}>{error}</div>}
           <div className="flex gap-3">

@@ -1,16 +1,48 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Receipt, ChevronDown, Filter } from 'lucide-react';
+import { Plus, Receipt, Filter } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageToggle from '@/components/LanguageToggle';
 import BottomNav from '@/components/BottomNav';
 import { format } from 'date-fns';
 
-interface Expense { id: string; category: string; amount: number; description?: string; date: string; plot?: { name: string }; shop?: { shopName: string }; }
+interface Expense { id: string; category: string; amount: number; description?: string; date: string; plot?: { name: string }; shop?: { shopName: string }; sourceType?: string; }
 
-const CATS = ['seed', 'fertilizer', 'pesticide', 'irrigation', 'machinery', 'labour', 'transport', 'rent', 'loanEmi', 'maintenance', 'misc'];
-const CAT_COLORS: Record<string, string> = { seed: '#16a34a', fertilizer: '#0369a1', pesticide: '#dc2626', irrigation: '#0891b2', machinery: '#7c3aed', labour: '#d97706', transport: '#ea580c', rent: '#be123c', loanEmi: '#4338ca', maintenance: '#475569', misc: '#6b7280' };
+// ✅ Matches ExpenseCategory enum in schema.prisma
+const CATS = ['labour', 'spray', 'seeds', 'fertilizer', 'irrigation', 'fuel', 'transport', 'equipment', 'purchase', 'advance', 'rent', 'other'];
+
+// ✅ Colors matched to correct enum values
+const CAT_COLORS: Record<string, string> = {
+  labour: '#d97706',
+  spray: '#dc2626',
+  seeds: '#16a34a',
+  fertilizer: '#0369a1',
+  irrigation: '#0891b2',
+  fuel: '#ea580c',
+  transport: '#7c3aed',
+  equipment: '#4338ca',
+  purchase: '#be123c',
+  advance: '#475569',
+  rent: '#9333ea',
+  other: '#6b7280',
+};
+
+// Fallback labels
+const CAT_LABELS: Record<string, string> = {
+  labour: 'Labour / मजदूरी',
+  spray: 'Spray / छिड़काव',
+  seeds: 'Seeds / बीज',
+  fertilizer: 'Fertilizer / खाद',
+  irrigation: 'Irrigation / सिंचाई',
+  fuel: 'Fuel / ईंधन',
+  transport: 'Transport / ढुलाई',
+  equipment: 'Equipment / उपकरण',
+  purchase: 'Shop Purchase / दुकान खरीद',
+  advance: 'Advance / अग्रिम',
+  rent: 'Rent / किराया',
+  other: 'Other / अन्य',
+};
 
 export default function ExpensesPage() {
   const { t } = useLanguage();
@@ -18,6 +50,11 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [filterCat, setFilterCat] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+
+  const getCatLabel = (c: string) => {
+    const translated = t.expenses?.categories?.[c as keyof typeof t.expenses.categories];
+    return translated || CAT_LABELS[c] || c;
+  };
 
   useEffect(() => {
     const url = `/api/expenses${filterCat ? `?category=${filterCat}` : ''}`;
@@ -51,7 +88,7 @@ export default function ExpensesPage() {
           <button onClick={() => setFilterCat('')} className={`tab-btn flex-shrink-0 ${!filterCat ? 'active' : ''}`}>{t.expenses.allCategories}</button>
           {CATS.map(c => (
             <button key={c} onClick={() => setFilterCat(c)} className={`tab-btn flex-shrink-0 ${filterCat === c ? 'active' : ''}`}>
-              {t.expenses.categories[c as keyof typeof t.expenses.categories]}
+              {getCatLabel(c)}
             </button>
           ))}
         </div>
@@ -59,7 +96,7 @@ export default function ExpensesPage() {
 
       <div className="page-content">
         {loading ? (
-          <div className="space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-20 rounded-2xl shimmer" />)}</div>
+          <div className="space-y-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-20 rounded-2xl shimmer" />)}</div>
         ) : expenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4" style={{ background: 'var(--green-pale)' }}>
@@ -82,13 +119,14 @@ export default function ExpensesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                       <p className="font-semibold text-sm capitalize truncate" style={{ color: 'var(--text-primary)' }}>
-                        {t.expenses.categories[exp.category as keyof typeof t.expenses.categories] || exp.category}
+                        {getCatLabel(exp.category)}
                       </p>
                       <p className="font-bold text-sm flex-shrink-0 ml-2" style={{ color: '#dc2626' }}>₹{exp.amount.toLocaleString('en-IN')}</p>
                     </div>
                     <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                       {exp.description && `${exp.description} • `}
                       {exp.plot?.name && `${exp.plot.name} • `}
+                      {exp.sourceType && exp.sourceType !== 'manual' && `Auto (${exp.sourceType}) • `}
                       {format(new Date(exp.date), 'dd MMM yyyy')}
                     </p>
                   </div>
