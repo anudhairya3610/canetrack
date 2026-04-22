@@ -55,8 +55,8 @@ export default function PlotDetailPage() {
   const [showAddWorker, setShowAddWorker] = useState(false);
   const [noteFilter, setNoteFilter] = useState<'all' | 'disease' | 'general'>('all');
 
-  // Worker list for today tab
-  const [workers, setWorkers] = useState<{ id: string; name: string }[]>([]);
+  // Worker list for today tab — NOW INCLUDES WAGE INFO
+  const [workers, setWorkers] = useState<{ id: string; name: string; wageAmount?: number; wageRateType?: string }[]>([]);
 
   const fetchPlot = useCallback(() => {
     fetch(`/api/plots/${plotId}`)
@@ -67,9 +67,22 @@ export default function PlotDetailPage() {
 
   useEffect(() => { fetchPlot(); }, [fetchPlot]);
 
+  // UPDATED: Fetch workers with wage info
   useEffect(() => {
     if (tab === 'workers') {
-      fetch('/api/workers').then(r => r.json()).then(d => setWorkers(d.map((w: { id: string; name: string }) => ({ id: w.id, name: w.name }))));
+      fetch('/api/workers')
+        .then(r => r.json())
+        .then(d => {
+          if (Array.isArray(d)) {
+            setWorkers(d.map((w: any) => ({
+              id: w.id,
+              name: w.name,
+              wageAmount: w.wageAmount,
+              wageRateType: w.wageRateType,
+            })));
+          }
+        })
+        .catch(() => { });
     }
   }, [tab]);
 
@@ -163,7 +176,6 @@ export default function PlotDetailPage() {
                 </div>
               </div>
             </div>
-            {/* Mark Completed */}
             {plot.status !== 'completed' && (
               <button
                 onClick={async () => {
@@ -179,7 +191,7 @@ export default function PlotDetailPage() {
           </div>
         )}
 
-        {/* TODAY WORKERS TAB */}
+        {/* TODAY WORKERS TAB — UPDATED */}
         {tab === 'workers' && (
           <div className="space-y-3 animate-fade-in">
             <button onClick={() => setShowAddWorker(true)} className="btn-primary">
@@ -190,20 +202,51 @@ export default function PlotDetailPage() {
             )}
             {todayWorkers.length === 0 ? (
               <div className="card text-center py-8">
-                <p style={{ color: 'var(--text-muted)' }}>{t.common.noData}</p>
+                <Users size={36} className="mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+                <p style={{ color: 'var(--text-muted)' }}>No workers assigned today</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Tap the button above to add a worker</p>
               </div>
             ) : (
-              todayWorkers.map(log => (
-                <div key={log.id} className="card flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--green-pale)' }}>
-                    <Users size={20} style={{ color: 'var(--green-primary)' }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{log.worker?.name}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{log.workNote || '—'}</p>
+              <>
+                {/* Today Summary */}
+                <div className="card" style={{ background: 'var(--green-pale)' }}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Today&apos;s Workers</p>
+                      <p className="text-lg font-bold" style={{ color: 'var(--green-primary)' }}>{todayWorkers.length} workers</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Labour Cost</p>
+                      <p className="text-lg font-bold" style={{ color: 'var(--green-primary)' }}>
+                        ₹{todayWorkers.reduce((s, l) => {
+                          const w = workers.find(w => w.id === l.workerId);
+                          return s + (w?.wageAmount || 0);
+                        }, 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))
+
+                {/* Worker Cards */}
+                {todayWorkers.map(log => {
+                  const w = workers.find(w => w.id === log.workerId);
+                  return (
+                    <div key={log.id} className="card flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+                        style={{ background: 'linear-gradient(135deg, var(--green-primary), var(--green-light))' }}>
+                        {log.worker?.name?.[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{log.worker?.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {log.workNote || 'No note'} • {w?.wageAmount ? `₹${w.wageAmount}` : ''}
+                        </p>
+                      </div>
+                      <span className="badge badge-green text-xs">✅ Assigned</span>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
@@ -422,36 +465,206 @@ export default function PlotDetailPage() {
 
 // ---- Sub-forms ----
 
-function AddWorkerToPlotForm({ plotId, workers, onClose, t }: { plotId: string; workers: {id: string; name: string}[]; onClose: () => void; t: ReturnType<typeof useLanguage>['t'] }) {
+function AddWorkerToPlotForm({ plotId, workers, onClose, t }: {
+  plotId: string;
+  workers: { id: string; name: string; wageAmount?: number; wageRateType?: string }[];
+  onClose: () => void;
+  t: ReturnType<typeof useLanguage>['t']
+}) {
   const [workerId, setWorkerId] = useState('');
+  const [status, setStatus] = useState<'present' | 'halfDay'>('present');
+  const [paidToday, setPaidToday] = useState(false);
+  const [customWage, setCustomWage] = useState('');
   const [workNote, setWorkNote] = useState('');
+  const [timeIn, setTimeIn] = useState('');
+  const [timeOut, setTimeOut] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const selectedWorker = workers.find(w => w.id === workerId);
+  const baseWage = customWage ? parseFloat(customWage) : (selectedWorker?.wageAmount || 0);
+  const actualWage = status === 'halfDay' ? baseWage / 2 : baseWage;
 
   const submit = async () => {
-    if (!workerId) return;
+    if (!workerId) { setError('Select a worker'); return; }
     setSubmitting(true);
-    await fetch('/api/plot-worker-logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plotId, workerId, workNote, date: new Date().toISOString() }),
-    });
-    setSubmitting(false);
-    onClose();
+    setError('');
+
+    try {
+      const res = await fetch('/api/plot-worker-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plotId,
+          workerId,
+          status,
+          paidToday,
+          wageAmount: customWage || undefined,
+          workNote,
+          timeIn: timeIn || undefined,
+          timeOut: timeOut || undefined,
+          date: new Date().toISOString(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed'); setSubmitting(false); return; }
+      onClose();
+    } catch {
+      setError('Something went wrong');
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="card space-y-3" style={{ border: '2px solid var(--green-primary)' }}>
+      {/* Worker Selector */}
       <div className="relative">
         <select value={workerId} onChange={e => setWorkerId(e.target.value)} className="input-field appearance-none pr-8">
           <option value="">-- {t.workers.name} --</option>
-          {workers.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+          {workers.map(w => (
+            <option key={w.id} value={w.id}>
+              {w.name} {w.wageAmount ? `(₹${w.wageAmount}/${w.wageRateType || 'day'})` : ''}
+            </option>
+          ))}
         </select>
         <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
       </div>
-      <input type="text" value={workNote} onChange={e => setWorkNote(e.target.value)} placeholder={t.plotDetail.workNote} className="input-field" />
+
+      {/* Show details only after worker is selected */}
+      {selectedWorker && (
+        <>
+          {/* Status: Full Day / Half Day */}
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+              Work Type
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['present', 'halfDay'] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatus(s)}
+                  className="py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: status === s ? 'var(--green-primary)' : 'var(--green-pale)',
+                    color: status === s ? 'white' : 'var(--green-primary)',
+                  }}
+                >
+                  {s === 'present' ? '☀️ Full Day' : '🌓 Half Day'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Wage Display + Override */}
+          <div>
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+              Wage (₹) — {status === 'halfDay' ? 'Half' : 'Full'} Day
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={customWage}
+                onChange={e => setCustomWage(e.target.value)}
+                placeholder={`${selectedWorker.wageAmount || 0}`}
+                className="input-field flex-1"
+              />
+              <div
+                className="px-4 py-3 rounded-xl font-bold text-sm whitespace-nowrap"
+                style={{ background: 'var(--green-pale)', color: 'var(--green-primary)' }}
+              >
+                = ₹{actualWage.toLocaleString('en-IN')}
+              </div>
+            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              Leave blank to use worker&apos;s default rate (₹{selectedWorker.wageAmount})
+            </p>
+          </div>
+
+          {/* Time In / Out */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Time In
+              </label>
+              <input
+                type="time"
+                value={timeIn}
+                onChange={e => setTimeIn(e.target.value)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Time Out
+              </label>
+              <input
+                type="time"
+                value={timeOut}
+                onChange={e => setTimeOut(e.target.value)}
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          {/* Work Note */}
+          <input
+            type="text"
+            value={workNote}
+            onChange={e => setWorkNote(e.target.value)}
+            placeholder="Work note (optional)"
+            className="input-field"
+          />
+
+          {/* Paid Today Toggle */}
+          <button
+            type="button"
+            onClick={() => setPaidToday(!paidToday)}
+            className="w-full py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2"
+            style={{
+              background: paidToday ? 'var(--green-primary)' : 'var(--bg-secondary)',
+              color: paidToday ? 'white' : 'var(--text-secondary)',
+              border: paidToday ? 'none' : '1px solid var(--border-color)',
+            }}
+          >
+            {paidToday ? '✅' : '⬜'} Paid Today — ₹{actualWage.toLocaleString('en-IN')}
+          </button>
+
+          {/* Summary Card */}
+          <div className="rounded-xl p-3 text-xs space-y-1" style={{ background: 'var(--green-pale)' }}>
+            <p style={{ color: 'var(--green-primary)' }}>
+              <strong>Summary:</strong>
+            </p>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              👤 {selectedWorker.name} → {status === 'halfDay' ? 'Half Day' : 'Full Day'}
+            </p>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              💰 ₹{actualWage.toLocaleString('en-IN')} will be added to plot expense
+            </p>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              📋 Attendance will be marked as {status === 'halfDay' ? 'half day' : 'present'}
+            </p>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              {paidToday ? '✅ Paid today — no pending dues' : '⏳ Not paid — added to pending dues'}
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* Error */}
+      {error && (
+        <p className="text-sm font-medium px-3 py-2 rounded-xl" style={{ background: '#fee2e2', color: '#dc2626' }}>
+          {error}
+        </p>
+      )}
+
+      {/* Buttons */}
       <div className="flex gap-2">
         <button onClick={onClose} className="btn-secondary flex-1 py-2.5 text-sm">{t.common.cancel}</button>
-        <button onClick={submit} disabled={submitting || !workerId} className="btn-primary flex-1 py-2.5 text-sm">{t.common.save}</button>
+        <button onClick={submit} disabled={submitting || !workerId} className="btn-primary flex-1 py-2.5 text-sm">
+          {submitting ? '...' : t.common.save}
+        </button>
       </div>
     </div>
   );
@@ -622,7 +835,7 @@ function AddExpenseForm({ plotId, onClose, t }: { plotId: string; onClose: () =>
   const submit = async () => {
     if (!form.category || !form.amount) return;
     setSubmitting(true);
-    await fetch('/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, plotId, userId: '' }) });
+    await fetch('/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, plotId }) });
     setSubmitting(false);
     onClose();
   };
